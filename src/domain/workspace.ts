@@ -10,7 +10,36 @@ export interface Workstream {
   status: WorkstreamStatus;
 }
 
-export type ActivityKind = "created" | "started" | "completed" | "reopened";
+/**
+ * Audit trail of user actions on the workspace (tasks, workstreams, queue).
+ * This is an application-level history of what the user did, not a tracker
+ * of input events.
+ */
+export type ActivityAction =
+  | "task.created"
+  | "task.status_changed"
+  | "workstream.created"
+  | "workstream.paused"
+  | "workstream.resumed"
+  | "queue.added"
+  | "queue.removed"
+  | "queue.moved";
+
+export type ActivityEntityType = "task" | "workstream";
+
+export const activityActions: ActivityAction[] = [
+  "task.created",
+  "task.status_changed",
+  "workstream.created",
+  "workstream.paused",
+  "workstream.resumed",
+  "queue.added",
+  "queue.removed",
+  "queue.moved",
+];
+
+/** Only the most recent entries are kept so local storage stays bounded. */
+export const ACTIVITY_LIMIT = 1000;
 
 export interface WorkItem {
   id: string;
@@ -23,15 +52,28 @@ export interface WorkItem {
 
 export interface ActivityEntry {
   id: string;
-  itemTitle: string;
-  kind: ActivityKind;
   occurredAt: string;
+  action: ActivityAction;
+  entityType: ActivityEntityType;
+  /** Id of the task/workstream the action applied to. */
+  entityId: string;
+  /** Name of the entity at the time of the action. */
+  title: string;
+  /** Workstream the task belonged to (task actions only). */
+  workstreamId?: string;
+  /** Priority of the task at the time of the action (task actions only). */
+  priority?: Priority;
+  /** Previous and new value for change actions (e.g. task status). */
+  from?: string;
+  to?: string;
 }
 
 export interface Workspace {
   items: WorkItem[];
   activity: ActivityEntry[];
   workstreams: Workstream[];
+  /** Ordered ids of open tasks the user has lined up to work on next. */
+  focusQueue: string[];
 }
 
 export const initialWorkspace: Workspace = {
@@ -66,17 +108,23 @@ export const initialWorkspace: Workspace = {
       createdAt: "2026-10-30T09:00:00.000Z",
     },
   ],
+  focusQueue: ["welcome-plan", "welcome-ideas"],
   activity: [
     {
       id: "welcome-activity",
-      itemTitle: "Your Mango Desk is ready",
-      kind: "created",
       occurredAt: "2026-10-30T09:00:00.000Z",
+      action: "task.created",
+      entityType: "task",
+      entityId: "welcome-plan",
+      title: "Sketch out the week’s big rocks",
+      workstreamId: "personal",
+      priority: "High",
     },
   ],
 };
 
 export const workstreamColors: WorkstreamColor[] = ["leaf", "tomato", "mango", "coral"];
+export const priorities: Priority[] = ["High", "Normal", "Low"];
 
 export function createId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
